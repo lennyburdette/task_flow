@@ -12,9 +12,13 @@ module TaskFlow
       @block        = block
     end
 
+    def connections
+      dependencies + Array.wrap(options[:between])
+    end
+
     def instance
       task_class = "#{type}_task".classify.to_sym
-      TaskFlow.const_get(task_class).new(name, dependencies, options, block)
+      TaskFlow.const_get(task_class).new(name, dependencies, connections, options, block)
     end
   end
 end

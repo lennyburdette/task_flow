@@ -6,7 +6,7 @@ module TaskFlow
     include TSort
     attr_reader :tree
 
-    delegate :[]=, :[], :each_key, :key?, to: :tree
+    delegate :[]=, :[], :each_key, :each, :reduce, :key?, to: :tree
     alias_method :to_hash, :tree
     alias_method :to_h, :tree
 
@@ -25,6 +25,10 @@ module TaskFlow
         accumulator.merge!(subtree(child, accumulator))
       end
       accumulator
+    end
+
+    def combined_subtrees(*branches)
+      branches.map { |name| subtree(name) }.reduce(&:merge)
     end
 
     def merge(other)

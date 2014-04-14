@@ -6,15 +6,10 @@ module TaskFlow
     attr_accessor :child_task
 
     def value
-      event.wait
       return child_task.value if child_task
       task.value
     end
     alias_method :result, :value
-
-    def update(time, value, reason)
-      event.set
-    end
 
     def create_task(registry, context = nil)
       @task ||= begin
@@ -29,10 +24,13 @@ module TaskFlow
 
             if result.is_a?(Symbol) && registry[result]
               self.child_task = registry[result]
-              registry[result].add_observer(self)
-              registry[result].fire
+
+              registry.find_parents(name).each do |input|
+                input.add_dependency(registry[result])
+              end
+
+              registry.fire_from_edges(result)
             else
-              event.set
               result
             end
           end

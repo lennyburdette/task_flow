@@ -117,7 +117,7 @@ describe TaskFlow do
         if context[:pick] == :long
           :longer_option
         else
-          "Shorter one"
+          'Shorter one'
         end
       end
     end
@@ -126,7 +126,45 @@ describe TaskFlow do
       expect(BranchingUseCase.new(:one).futures(:result).result).to eq :one
       expect(BranchingUseCase.new(:two).futures(:result).result).to eq :two
       expect(BranchingUseCase.new(:long).futures(:option).option).to eq :foo
-      expect(BranchingUseCase.new(:short).futures(:option).option).to eq "Shorter one"
+      expect(BranchingUseCase.new(:short).futures(:option).option).to eq 'Shorter one'
+    end
+  end
+
+  describe 'more complicated branching' do
+    let(:leaf_result) { 'all the way from the leaf' }
+
+    class ComplicatedBranchingUseCase
+      include TaskFlow
+
+      def initialize(context)
+        @context = context
+      end
+
+      async :leaf do
+        sleep(0.1)
+        leaf_result
+      end
+
+      async :other_leaf do
+        sleep(0.1)
+        'no one cares about this but it has to run'
+      end
+
+      async :async, depends: [:leaf, :other_leaf] do |inputs|
+        inputs[:leaf]
+      end
+
+      branch :branch, between: :async do |inputs, context|
+        context
+      end
+
+      async :result, depends: :branch do |inputs|
+        inputs[:branch]
+      end
+    end
+
+    it 'fires off a conditional subtree' do
+      expect(ComplicatedBranchingUseCase.new(:async).futures(:result).result).to eq leaf_result
     end
   end
 end

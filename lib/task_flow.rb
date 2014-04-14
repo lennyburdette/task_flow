@@ -38,30 +38,18 @@ module TaskFlow
     @instance_registry ||= registry.instances(context)
   end
 
-  def prepared_futures
-    @prepared_futures ||= []
-  end
-
   def futures(*names)
-    instance_registry.sorted(*names).map do |input|
-      prepared_futures.push(input.name)
-      input.connect(instance_registry)
-    end.select(&:leaf?)
-       .sort { |a, b| a.is_a?(AsyncTask) ? -1 : 1 }
-       .map(&:fire)
+    instance_registry.connect(*names)
+    instance_registry.fire_from_edges(*names)
 
     self
   end
 
   def method_missing(method_name, *args, &block)
-    if instance_registry[method_name]
-      if prepared_futures.include?(method_name)
-        instance_registry[method_name].result
-      else
-        fail DependenciesNotPrepared, "Call `#futures(:#{method_name})` first"
-      end
-    else
-      super
+    case instance_registry.task_state(method_name)
+    when :ready then instance_registry[method_name].result
+    when :unavailable then fail DependenciesNotPrepared, "Call `#futures(:#{method_name})` first"
+    else super
     end
   end
 

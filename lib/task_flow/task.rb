@@ -2,18 +2,28 @@
 require 'concurrent'
 require 'active_support/notifications'
 
+module Concurrent
+  class DependencyCounter # :nodoc:
+    def increment
+      @counter.increment
+    end
+  end
+end
+
 module TaskFlow
   class Task
-    attr_reader :name, :dependencies, :options, :block, :task, :event
+    attr_reader :name, :dependencies, :connections, :options, :block, :task, :event
     delegate :add_observer, to: :task
     delegate :instrument, to: ActiveSupport::Notifications
 
     cattr_accessor(:default_options) { Hash.new }
     cattr_accessor(:task_options) { Hash.new }
+    cattr_accessor(:exception_reporter) { ->(*args) {} }
 
-    def initialize(name, dependencies, options, block)
+    def initialize(name, dependencies, connections, options, block)
       @name         = name
       @dependencies = dependencies
+      @connections  = connections
       @options      = options.reverse_merge(default_options)
       @block        = block
       @event        = Concurrent::Event.new
@@ -52,6 +62,11 @@ module TaskFlow
       @dependency_observer ||= Concurrent::DependencyCounter.new(dependencies.size) { task.execute }
     end
 
+    def add_dependency(input)
+      dependency_observer.increment
+      input.add_observer(dependency_observer)
+    end
+
     def value
       task.value(options[:timeout]) # possibly blocking
 
@@ -63,7 +78,8 @@ module TaskFlow
     end
 
     def handle_exception
-      instrument("#{name}.exception.task_flow")
+      exception_reporter.call(name, task.reason)
+      instrument("#{name}.exception.task_flow", exception: task.reason)
       if options.key?(:on_exception)
         options[:on_exception].respond_to?(:call) ?
           options[:on_exception].call :
