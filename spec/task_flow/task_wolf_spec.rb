@@ -107,11 +107,26 @@ describe TaskFlow do
       sync :result, :pick_one do |inputs|
         inputs[:pick_one]
       end
+
+      async :longer_option do
+        sleep(0.1)
+        :foo
+      end
+
+      branch :option do |_, context|
+        if context[:pick] == :long
+          :longer_option
+        else
+          "Shorter one"
+        end
+      end
     end
 
     it 'conditionally executes tasks based on the result of another task' do
       expect(BranchingUseCase.new(:one).futures(:result).result).to eq :one
       expect(BranchingUseCase.new(:two).futures(:result).result).to eq :two
+      expect(BranchingUseCase.new(:long).futures(:option).option).to eq :foo
+      expect(BranchingUseCase.new(:short).futures(:option).option).to eq "Shorter one"
     end
   end
 end

@@ -7,8 +7,10 @@ module TaskFlow
 
     def value
       event.wait
-      child_task.value if child_task
+      return child_task.value if child_task
+      task.value
     end
+    alias_method :result, :value
 
     def update(time, value, reason)
       event.set
@@ -23,15 +25,15 @@ module TaskFlow
             values = inputs.reduce({}) do |acc, (name, input)|
               acc.merge(name => input.value)
             end
-            child = block.call(values, context)
+            result = block.call(values, context)
 
-            if registry[child]
-              self.child_task = registry[child]
-              registry[child].add_observer(self)
-              registry[child].fire
+            if result.is_a?(Symbol) && registry[result]
+              self.child_task = registry[result]
+              registry[result].add_observer(self)
+              registry[result].fire
             else
               event.set
-              nil
+              result
             end
           end
         end
