@@ -1,6 +1,7 @@
 # encoding: utf-8
-require 'concurrent'
 require 'active_support/notifications'
+require 'concurrent'
+require 'timeout'
 
 module Concurrent
   class DependencyCounter # :nodoc:
@@ -34,11 +35,13 @@ module TaskFlow
         inputs = registry.slice(*dependencies)
 
         task_class.new(task_options) do
-          instrument("#{name}.tasks.task_flow") do
-            values = inputs.reduce({}) do |acc, (name, input)|
-              acc.merge(name => input.value)
+          Timeout::timeout(options[:timeout]) do
+            instrument("#{name}.tasks.task_flow") do
+              values = inputs.reduce({}) do |acc, (name, input)|
+                acc.merge(name => input.value)
+              end
+              block.call(values, context)
             end
-            block.call(values, context)
           end
         end
       end
@@ -72,7 +75,6 @@ module TaskFlow
 
       case task.state
       when :fulfilled then task.value
-      when :pending then (fail Timeout::Error, "#{name} timed out")
       else handle_exception
       end
     end

@@ -69,6 +69,28 @@ describe TaskFlow do
       sync :handles_error, :caught_error do |inputs|
         inputs[:caught_error]
       end
+
+      async :timeout, timeout: 0.1 do
+        sleep(1)
+        :should_not_appear
+      end
+
+      async :timeout_swallowed, timeout: 0.1, on_exception: :swallowed do
+        sleep(1)
+        :should_not_appear
+      end
+
+      sync :from_timeout, :timeout do
+        :should_raise_exception
+      end
+
+      sync :from_timeout_handled, :timeout, on_exception: :handled do
+        :should_return_handled
+      end
+
+      sync :from_timeout_swallowed, :timeout_swallowed do |inputs|
+        inputs[:timeout_swallowed]
+      end
     end
 
     it 'propagates errors from threads' do
@@ -79,6 +101,23 @@ describe TaskFlow do
 
     it 'swallows errors when told to' do
       expect(ExceptionHandlingCase.new.futures(:handles_error).handles_error).to eq :handled
+    end
+
+    it 'raises a timeout' do
+      expect do
+        ExceptionHandlingCase.new.futures(:from_timeout).from_timeout
+      end.to raise_error(Timeout::Error)
+    end
+
+    it 'handles a propagated timeout' do
+      expect(ExceptionHandlingCase.new.futures(:from_timeout_handled).from_timeout_handled).to eq :handled
+    end
+
+    it 'swallows a timeout at the source' do
+      expect(
+        ExceptionHandlingCase.new
+        .futures(:from_timeout_swallowed).from_timeout_swallowed
+      ).to eq :swallowed
     end
   end
 
@@ -131,8 +170,6 @@ describe TaskFlow do
   end
 
   describe 'more complicated branching' do
-    let(:leaf_result) { 'all the way from the leaf' }
-
     class ComplicatedBranchingUseCase
       include TaskFlow
 
@@ -142,7 +179,7 @@ describe TaskFlow do
 
       async :leaf do
         sleep(0.1)
-        leaf_result
+        'from leaf'
       end
 
       async :other_leaf do
@@ -164,7 +201,7 @@ describe TaskFlow do
     end
 
     it 'fires off a conditional subtree' do
-      expect(ComplicatedBranchingUseCase.new(:async).futures(:result).result).to eq leaf_result
+      expect(ComplicatedBranchingUseCase.new(:async).futures(:result).result).to eq 'from leaf'
     end
   end
 end
