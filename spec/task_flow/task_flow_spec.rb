@@ -16,16 +16,20 @@ describe TaskFlow do
       end
 
       sync :three, depends: :one do |inputs|
-        inputs[:one] * 3
+        inputs.one * 3
       end
 
       async :four, depends: :two do |inputs|
         sleep(0.1)
-        inputs[:two] * inputs[:two]
+        inputs.two * inputs.two
       end
 
       sync :seven, depends: [:three, :four] do |inputs|
         inputs.values.reduce(&:+)
+      end
+
+      sync :failure, depends: :one do |inputs|
+        inputs.this_doesnt_exist
       end
     end
 
@@ -35,7 +39,8 @@ describe TaskFlow do
         two: [],
         three: [:one],
         four: [:two],
-        seven: [:three, :four]
+        seven: [:three, :four],
+        failure: [:one],
       )
     end
 
@@ -48,6 +53,12 @@ describe TaskFlow do
         SimpleUseCase.new.seven
       end.to raise_error(TaskFlow::DependenciesNotPrepared)
     end
+
+    it 'complains when you access an task value that doesn\'t exist' do
+      expect do
+        SimpleUseCase.new.futures(:failure).failure
+      end.to raise_error(NoMethodError)
+    end
   end
 
   describe 'exception handling' do
@@ -58,8 +69,8 @@ describe TaskFlow do
         fail StandardError
       end
 
-      sync :propagates_error, :error do
-        inputs[:error]
+      sync :propagates_error, :error do |inputs|
+        inputs.error
       end
 
       async :caught_error, on_exception: -> { :handled } do
@@ -67,7 +78,7 @@ describe TaskFlow do
       end
 
       sync :handles_error, :caught_error do |inputs|
-        inputs[:caught_error]
+        inputs.caught_error
       end
 
       async :timeout, timeout: 0.1 do
@@ -89,7 +100,7 @@ describe TaskFlow do
       end
 
       sync :from_timeout_swallowed, :timeout_swallowed do |inputs|
-        inputs[:timeout_swallowed]
+        inputs.timeout_swallowed
       end
     end
 
@@ -139,12 +150,12 @@ describe TaskFlow do
         :two
       end
 
-      branch :pick_one do |_, context|
+      branch :pick_one, between: [:expensive_one, :expensive_two] do |_, context|
         "expensive_#{context[:pick]}".to_sym
       end
 
       sync :result, :pick_one do |inputs|
-        inputs[:pick_one]
+        inputs.pick_one
       end
 
       async :longer_option do
@@ -152,7 +163,7 @@ describe TaskFlow do
         :foo
       end
 
-      branch :option do |_, context|
+      branch :option, between: :longer_option do |_, context|
         if context[:pick] == :long
           :longer_option
         else
@@ -188,7 +199,7 @@ describe TaskFlow do
       end
 
       async :async, depends: [:leaf, :other_leaf] do |inputs|
-        inputs[:leaf]
+        inputs.leaf
       end
 
       branch :branch, between: :async do |inputs, context|
@@ -196,7 +207,7 @@ describe TaskFlow do
       end
 
       async :result, depends: :branch do |inputs|
-        inputs[:branch]
+        inputs.branch
       end
     end
 
@@ -220,7 +231,7 @@ describe TaskFlow do
       end
 
       sync :result, :two do |inputs|
-        inputs[:two]
+        inputs.two
       end
     end
 

@@ -1,9 +1,19 @@
 # encoding: utf-8
 require 'task_flow/present'
+require 'task_flow/task_values'
 
 module TaskFlow
+  class MissingBranchConnectionsError < StandardError; end
+
   class BranchTask < Task
     attr_accessor :child_task
+
+    def initialize(name, dependencies, connections, options, block)
+      unless Array.wrap(options[:between]).any?
+        fail MissingBranchConnectionsError, 'Specify branch alternatives with `between: [:task1, :task2]`'
+      end
+      super
+    end
 
     def value
       return child_task.value if child_task
@@ -17,10 +27,7 @@ module TaskFlow
 
         Present.new do
           instrument("#{name}.tasks.task_flow") do
-            values = inputs.reduce({}) do |acc, (name, input)|
-              acc.merge(name => input.value)
-            end
-            result = block.call(values, context)
+            result = block.call(TaskValues.new(inputs), context)
 
             if result.is_a?(Symbol) && registry[result]
               self.child_task = registry[result]

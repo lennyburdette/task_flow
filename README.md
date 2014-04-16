@@ -8,6 +8,8 @@ This library is inspired by [ConcurrentRuby's](https://github.com/jdantonio/conc
 
 ## Installation
 
+**I'm still developing this! You probably don't want to use it until I start incrementing the version number.**
+
 Add this line to your application's Gemfile:
 
     gem 'task_flow'
@@ -41,7 +43,7 @@ class PersonFetcher
   end
 
   sync :person, depends: :github, :twitter do |inputs, context|
-    Person.new(context[:user_name], profiles: [inputs[:twitter], inputs[:github]])
+    Person.new(context[:user_name], profiles: [inputs.twitter, inputs.github])
   end
 end
 ```

@@ -21,7 +21,7 @@ module TaskFlow
 
     def subtree(branch, accumulator = DependencyTree.new)
       accumulator.merge!(branch => tree[branch])
-      fail "Missing task #{branch}" unless tree.key?(branch)
+      fail "Missing task `#{branch}`" unless tree.key?(branch)
       tree[branch].each do |child|
         accumulator.merge!(subtree(child, accumulator))
       end

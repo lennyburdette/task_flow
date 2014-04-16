@@ -2,6 +2,7 @@
 require 'active_support/notifications'
 require 'concurrent'
 require 'timeout'
+require 'task_flow/task_values'
 
 module Concurrent
   class DependencyCounter # :nodoc:
@@ -18,7 +19,6 @@ module TaskFlow
     delegate :instrument, to: ActiveSupport::Notifications
 
     cattr_accessor(:default_options) { Hash.new }
-    cattr_accessor(:task_options) { Hash.new }
     cattr_accessor(:exception_reporter) { ->(*args) {} }
 
     def initialize(name, dependencies, connections, options, block)
@@ -34,13 +34,10 @@ module TaskFlow
       @task ||= begin
         inputs = registry.slice(*dependencies)
 
-        task_class.new(task_options) do
+        task_class.new do
           Timeout::timeout(options[:timeout]) do
             instrument("#{name}.tasks.task_flow") do
-              values = inputs.reduce({}) do |acc, (name, input)|
-                acc.merge(name => input.value)
-              end
-              block.call(values, context)
+              block.call(TaskValues.new(inputs), context)
             end
           end
         end
@@ -71,7 +68,7 @@ module TaskFlow
     end
 
     def value
-      task.value(options[:timeout]) # possibly blocking
+      task.value # possibly blocking
 
       case task.state
       when :fulfilled then task.value
