@@ -4,8 +4,10 @@ require 'task_flow/present'
 module TaskFlow
   class SyncTask < Task
     def result
-      event.wait if dependencies.any?
-      value
+      instrument("#{name}.results.task_flow") do
+        event.wait if dependencies.any?
+        value
+      end
     end
 
     def task_class

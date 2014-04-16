@@ -204,4 +204,43 @@ describe TaskFlow do
       expect(ComplicatedBranchingUseCase.new(:async).futures(:result).result).to eq 'from leaf'
     end
   end
+
+  describe 'instrumentation' do
+    class InstrumentedUseCase
+      include TaskFlow
+
+      async :one do
+        sleep(0.1)
+        1
+      end
+
+      async :two, :one, on_exception: 2 do
+        sleep(0.1)
+        fail 'testing'
+      end
+
+      sync :result, :two do |inputs|
+        inputs[:two]
+      end
+    end
+
+    let(:events) { Hash.new { [] } }
+
+    around do |spec|
+      subscriber = ->(name, start, finish, id, payload) do
+        events[name] = [name, start, finish, id, payload]
+      end
+      ActiveSupport::Notifications.subscribed(subscriber, /task_flow$/) do
+        spec.run
+      end
+    end
+
+    it 'reports tasks, exceptions, and result timing' do
+      InstrumentedUseCase.new.futures(:result).result
+      expect(events.key?('one.tasks.task_flow')).to be_true
+      expect(events['two.exceptions.task_flow'].last[:swallowed]).to be_true
+      duration = events['result.results.task_flow'][2] - events['result.results.task_flow'][1]
+      expect(duration).to be > 0.2
+    end
+  end
 end

@@ -80,9 +80,11 @@ module TaskFlow
     end
 
     def handle_exception
+      swallow = options.key?(:on_exception)
       exception_reporter.call(name, task.reason)
-      instrument("#{name}.exception.task_flow", exception: task.reason)
-      if options.key?(:on_exception)
+      instrument("#{name}.exceptions.task_flow", exception: task.reason, swallowed: swallow)
+
+      if swallow
         options[:on_exception].respond_to?(:call) ?
           options[:on_exception].call :
           options[:on_exception]
