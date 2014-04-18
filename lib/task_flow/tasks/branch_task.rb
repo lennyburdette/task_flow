@@ -15,8 +15,8 @@ module TaskFlow
       super
     end
 
-    def value
-      return child_task.value if child_task
+    def value(timeout = nil)
+      return child_task.value(timeout || options[:timeout]) if child_task
       task.value
     end
     alias_method :result, :value

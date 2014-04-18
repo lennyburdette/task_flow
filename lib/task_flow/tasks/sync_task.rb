@@ -5,7 +5,7 @@ module TaskFlow
   class SyncTask < Task
     def result
       instrument("#{name}.results.task_flow") do
-        event.wait if dependencies.any?
+        event.wait(options[:timeout]) if dependencies.any?
         value
       end
     end

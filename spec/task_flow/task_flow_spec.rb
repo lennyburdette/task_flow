@@ -102,6 +102,21 @@ describe TaskFlow do
       sync :from_timeout_swallowed, :timeout_swallowed do |inputs|
         inputs.timeout_swallowed
       end
+
+      async :task_never_ends do
+        while true
+        end
+      end
+
+      sync :handle_hung_task, depends: :task_never_ends, timeout: 0.1 do |inputs|
+      end
+
+      async :async_handle_hung_task, depends: :task_never_ends, timeout: 0.1 do |inputs|
+      end
+
+      branch :branch_handle_hung_task, between: :task_never_ends, timeout: 0.1 do
+        :task_never_ends
+      end
     end
 
     it 'propagates errors from threads' do
@@ -129,6 +144,57 @@ describe TaskFlow do
         ExceptionHandlingCase.new
         .futures(:from_timeout_swallowed).from_timeout_swallowed
       ).to eq :swallowed
+    end
+
+    it 'times out on extremely long tasks' do
+      expect do
+        ExceptionHandlingCase.new
+        .futures(:handle_hung_task).handle_hung_task
+      end.to raise_error(Timeout::Error)
+    end
+
+    it 'times out on extremely long tasks, async version' do
+      expect do
+        ExceptionHandlingCase.new
+        .futures(:async_handle_hung_task).async_handle_hung_task
+      end.to raise_error(Timeout::Error)
+    end
+
+    it 'times out on extremely long tasks, branch version' do
+      expect do
+        ExceptionHandlingCase.new
+        .futures(:branch_handle_hung_task).branch_handle_hung_task
+      end.to raise_error(Timeout::Error)
+    end
+  end
+
+  describe 'thread management' do
+    class ThreadDeathUseCase
+      include TaskFlow
+
+      async :death do
+        Thread.exit
+      end
+
+      async :horseman, depends: :death do |inputs|
+        inputs.death
+        "neigh"
+      end
+
+      async :reap, depends: [:death, :horseman] do |inputs|
+        inputs.horseman
+      end
+
+      sync :grim_reaper, depends: :reap, timeout: 0.1 do |inputs|
+        inputs.reap
+        "avoided-death"
+      end
+    end
+
+    it 'doesn\'t get locked up' do
+      expect do
+        ThreadDeathUseCase.new.futures(:grim_reaper).grim_reaper
+      end.to raise_error(Timeout::Error)
     end
   end
 

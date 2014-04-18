@@ -18,7 +18,7 @@ module TaskFlow
     delegate :add_observer, to: :task
     delegate :instrument, to: ActiveSupport::Notifications
 
-    cattr_accessor(:default_options) { Hash.new }
+    cattr_accessor(:default_options) { { timeout: 30 } }
     cattr_accessor(:exception_reporter) { ->(*args) {} }
 
     def initialize(name, dependencies, connections, options, block)
@@ -67,26 +67,29 @@ module TaskFlow
       input.add_observer(dependency_observer)
     end
 
-    def value
-      task.value # possibly blocking
+    def value(timeout = nil)
+      task.value(timeout || options[:timeout]) # possibly blocking
 
       case task.state
       when :fulfilled then task.value
-      else handle_exception
+      when :pending, :unscheduled then (raise Timeout::Error, "#{name} timed out")
+      else (raise task.reason if task.reason)
       end
+    rescue Exception => e
+      handle_exception(e)
     end
 
-    def handle_exception
+    def handle_exception(exception)
       swallow = options.key?(:on_exception)
-      exception_reporter.call(name, task.reason)
-      instrument("#{name}.exceptions.task_flow", exception: task.reason, swallowed: swallow)
+      exception_reporter.call(name, exception, swallow)
+      instrument("#{name}.exceptions.task_flow", exception: exception, swallowed: swallow)
 
       if swallow
         options[:on_exception].respond_to?(:call) ?
           options[:on_exception].call :
           options[:on_exception]
       else
-        fail task.reason if task.reason
+        fail exception
       end
     end
 
