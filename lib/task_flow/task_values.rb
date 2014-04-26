@@ -7,6 +7,11 @@ module TaskFlow
       end
     end
 
+    def to_hash
+      @values.dup
+    end
+    alias_method :to_h, :to_hash
+
     def values
       @values.values
     end
