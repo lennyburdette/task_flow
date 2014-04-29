@@ -47,7 +47,7 @@ module TaskFlow
 
   def method_missing(method_name, *args, &block)
     case instance_registry.task_state(method_name)
-    when :ready then instance_registry[method_name].result
+    when :ready then instance_registry[method_name].result(instance_registry)
     when :unavailable then fail DependenciesNotPrepared, "Call `#futures(:#{method_name})` first"
     else super
     end

@@ -19,7 +19,10 @@ module TaskFlow
       return child_task.value(timeout || options[:timeout]) if child_task
       task.value
     end
-    alias_method :result, :value
+
+    def result(registry)
+      value(registry.cumulative_timeout(name))
+    end
 
     def create_task(registry, context = nil)
       @task ||= begin

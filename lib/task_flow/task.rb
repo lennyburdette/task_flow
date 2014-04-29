@@ -18,7 +18,7 @@ module TaskFlow
     delegate :add_observer, to: :task
     delegate :instrument, to: ActiveSupport::Notifications
 
-    cattr_accessor(:default_options) { { timeout: 30 } }
+    cattr_accessor(:default_options) { {} }
     cattr_accessor(:exception_reporter) { ->(*args) {} }
 
     def initialize(name, dependencies, connections, options, block)
@@ -35,12 +35,20 @@ module TaskFlow
         inputs = registry.slice(*dependencies)
 
         task_class.new do
-          Timeout::timeout(options[:timeout]) do
+          timeout do
             instrument("#{name}.tasks.task_flow") do
               block.call(TaskValues.new(inputs), context)
             end
           end
         end
+      end
+    end
+
+    def timeout(&block)
+      if options[:timeout]
+        Timeout::timeout(options[:timeout], &block)
+      else
+        yield
       end
     end
 

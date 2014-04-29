@@ -3,10 +3,22 @@ require 'task_flow/present'
 
 module TaskFlow
   class SyncTask < Task
-    def result
+    def result(registry)
       instrument("#{name}.results.task_flow") do
-        event.wait(options[:timeout]) if dependencies.any?
-        value
+        return value unless dependencies.any?
+
+        timeouts = registry.cumulative_timeout(name)
+        if event.wait(timeouts)
+          value
+        else
+          reasons = registry.dependency_states(name).map do |name, state|
+            case state
+            when :pending then "\t#{name} never finished"
+            when :unscheduled then "\t#{name} never started"
+            end
+          end
+          fail Timeout::Error, "#{name} result timed out because:\n#{reasons.join("\n")}"
+        end
       end
     end
 

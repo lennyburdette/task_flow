@@ -76,5 +76,21 @@ module TaskFlow
         acc
       end
     end
+
+    def cumulative_timeout(branch)
+      sorted(connection_tree, branch).map do |task|
+        if task.is_a?(AsyncTask)
+          task.options[:timeout]
+        else
+          0.1
+        end
+      end.reduce(&:+)
+    end
+
+    def dependency_states(branch)
+      sorted(connection_tree, branch).reduce({}) do |acc, task|
+        acc.merge(task.name => task.task.state)
+      end
+    end
   end
 end

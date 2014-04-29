@@ -1,7 +1,9 @@
 # encoding: utf-8
 module TaskFlow
   class AsyncTask < Task
-    def result
+    cattr_accessor(:default_options) { { timeout: 1 } }
+
+    def result(registry = nil)
       value(options[:timeout])
     end
 
