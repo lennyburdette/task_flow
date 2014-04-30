@@ -9,6 +9,12 @@ module TaskFlow
 
   class DependenciesNotPrepared < StandardError; end
 
+  JAVA_EXCEPTIONS = if RUBY_PLATFORM == 'java'
+                      [java.lang.Error]
+                    else
+                      []
+                    end
+
   included do
     cattr_accessor(:registry) { Registry.new }
     attr_reader :context

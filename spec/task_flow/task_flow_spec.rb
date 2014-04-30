@@ -320,4 +320,22 @@ describe TaskFlow do
       expect(duration).to be > 0.2
     end
   end
+
+  if RUBY_PLATFORM == 'java'
+    describe 'java exception handling' do
+      class JavaExceptionUseCase
+        include TaskFlow
+
+        sync :fails do
+          raise java.lang.Error.new
+        end
+      end
+
+      it 'wraps java exceptions when re-raising' do
+        expect do
+          JavaExceptionUseCase.new.futures(:fails).fails
+        end.to raise_error(RuntimeError)
+      end
+    end
+  end
 end

@@ -83,6 +83,8 @@ module TaskFlow
       when :pending, :unscheduled then (raise Timeout::Error, "#{name} timed out")
       else (raise task.reason if task.reason)
       end
+    rescue *TaskFlow::JAVA_EXCEPTIONS => e
+      handle_exception(wrap_java_exception(e))
     rescue Exception => e
       handle_exception(e)
     end
@@ -98,6 +100,12 @@ module TaskFlow
           options[:on_exception]
       else
         fail exception
+      end
+    end
+
+    def wrap_java_exception(e)
+      RuntimeError.new("#{e.class} #{e.message}").tap do |java_error|
+        java_error.set_backtrace(e.backtrace)
       end
     end
 

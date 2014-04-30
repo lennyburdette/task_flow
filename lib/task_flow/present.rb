@@ -27,7 +27,7 @@ module TaskFlow
       return @value if defined?(@value)
       return nil if defined?(@reason)
       @value = @block.call
-    rescue => exception
+    rescue Exception, *TaskFlow::JAVA_EXCEPTIONS => exception
       @reason = exception
     end
 
