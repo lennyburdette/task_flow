@@ -10,7 +10,7 @@ module TaskFlow
   class DependenciesNotPrepared < StandardError; end
 
   JAVA_EXCEPTIONS = if RUBY_PLATFORM == 'java'
-                      [java.lang.Error]
+                      [java.lang.Throwable]
                     else
                       []
                     end

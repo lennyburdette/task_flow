@@ -327,7 +327,12 @@ describe TaskFlow do
         include TaskFlow
 
         sync :fails do
-          raise java.lang.Error.new
+          # throws Java::JavaLang::IllegalArgumentException
+          java.util.concurrent.ThreadPoolExecutor.new(
+            100, 1, 0,
+            java.util.concurrent.TimeUnit::SECONDS,
+            java.util.concurrent.SynchronousQueue.new,
+            java.util.concurrent.ThreadPoolExecutor::AbortPolicy)
         end
       end
 
