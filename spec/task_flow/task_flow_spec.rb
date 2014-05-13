@@ -282,6 +282,27 @@ describe TaskFlow do
     end
   end
 
+  describe 'even more complicated branching' do
+    class BranchDepsUseCase
+      include TaskFlow
+
+      async(:a1) { sleep(0.1) }
+      async(:b1) { sleep(0.1) }
+      async(:c1) { sleep(0.1) }
+
+      sync(:a, :a1) { 'a' }
+      sync(:b, :a, :b1) { |i| "#{i.a}b" }
+      sync(:c, :b, :c1) { |i| "#{i.b}c" }
+
+      async(:d, :c) { |i| "#{i.c}d" }
+      branch(:e, :c, between: :d) { |i| :d }
+    end
+
+    it 'fires off dependencies only once' do
+      expect(BranchDepsUseCase.new.futures(:e).e).to eq 'abcd'
+    end
+  end
+
   describe 'instrumentation' do
     class InstrumentedUseCase
       include TaskFlow

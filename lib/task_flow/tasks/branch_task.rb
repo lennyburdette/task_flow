@@ -16,11 +16,12 @@ module TaskFlow
     end
 
     def value(timeout = nil)
-      return child_task.value(timeout || options[:timeout]) if child_task
+      return child_task.value(timeout) if child_task
       task.value
     end
 
     def result(registry)
+      event.wait(registry.cumulative_timeout(name))
       value(registry.cumulative_timeout(name))
     end
 
@@ -30,18 +31,22 @@ module TaskFlow
 
         Present.new do
           instrument("#{name}.tasks.task_flow") do
-            result = block.call(TaskValues.new(inputs), context)
+            begin
+              result = block.call(TaskValues.new(inputs), context)
 
-            if result.is_a?(Symbol) && registry[result]
-              self.child_task = registry[result]
+              if result.is_a?(Symbol) && registry[result]
+                self.child_task = registry[result]
 
-              registry.find_parents(name).each do |input|
-                input.add_dependency(registry[result])
+                registry.find_parents(name).each do |input|
+                  input.add_dependency(registry[result])
+                end
+
+                registry.fire_from_edges(result)
+              else
+                result
               end
-
-              registry.fire_from_edges(result)
-            else
-              result
+            ensure
+              event.set
             end
           end
         end
