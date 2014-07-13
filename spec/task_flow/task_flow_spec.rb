@@ -303,6 +303,32 @@ describe TaskFlow do
     end
   end
 
+  describe 'unused tasks' do
+    class BranchDepsUseCase
+      include TaskFlow
+
+      async(:a1) { sleep(0.1) }
+      async(:b1) { sleep(0.1) }
+      async(:c1) { sleep(0.1) }
+
+      sync(:a, :a1) { 'a' }
+      sync(:b, :a, :b1) { |i| "#{i.a}b" }
+      sync(:c, :b, :c1) { |i| "#{i.b}c" }
+
+      async(:d, :c) { |i| $unused_task_fired = true; "#{i.c}d" }
+      branch(:f, :c, between: :d) { |i| 'f' }
+    end
+
+    before do
+      $unused_task_fired = nil
+    end
+
+    it 'do not fire' do
+      expect(BranchDepsUseCase.new.futures(:f).f).to eq 'f'
+      expect($unused_task_fired).to be_false
+    end
+  end
+
   describe 'instrumentation' do
     class InstrumentedUseCase
       include TaskFlow

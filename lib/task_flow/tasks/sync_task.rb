@@ -17,7 +17,7 @@ module TaskFlow
             when :unscheduled then "\t#{name} never started"
             end
           end
-          fail Timeout::Error, "#{name} result timed out because:\n#{reasons.join("\n")}"
+          fail Timeout::Error, "#{name} result timed out because:\n#{reasons.compact.join("\n")}"
         end
       end
     end

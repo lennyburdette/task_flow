@@ -44,10 +44,24 @@ module TaskFlow
     end
 
     def connect(*branches)
+      sorted(dependency_tree, *branches).map do |input|
+        prepared_futures.push(input.name)
+        input.connect(self)
+      end
+    end
+
+    def connect_including_betweens(*branches)
       sorted(connection_tree, *branches).map do |input|
         prepared_futures.push(input.name)
         input.connect(self)
       end
+    end
+
+    def proxy_dependencies(options)
+      find_parents(options[:from]).each do |input|
+        input.add_dependency(options[:instance])
+      end
+      connect_including_betweens(options[:to])
     end
 
     def fire_from_edges(*names)

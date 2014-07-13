@@ -32,18 +32,12 @@ module TaskFlow
         Present.new do
           instrument("#{name}.tasks.task_flow") do
             begin
-              result = block.call(TaskValues.new(inputs), context)
-
-              if result.is_a?(Symbol) && registry[result]
-                self.child_task = registry[result]
-
-                registry.find_parents(name).each do |input|
-                  input.add_dependency(registry[result])
+              block.call(TaskValues.new(inputs), context).tap do |result|
+                if result.is_a?(Symbol) && registry[result]
+                  self.child_task = registry[result]
+                  registry.proxy_dependencies(from: name, to: result, instance: registry[result])
+                  registry.fire_from_edges(result)
                 end
-
-                registry.fire_from_edges(result)
-              else
-                result
               end
             ensure
               event.set
