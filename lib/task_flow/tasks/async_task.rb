@@ -1,7 +1,9 @@
 # encoding: utf-8
 module TaskFlow
   class AsyncTask < Task
-    cattr_accessor(:default_options) { { timeout: 1 } }
+    def initialize(name, dependencies, connections, options, block)
+      super(name, dependencies, connections, options.merge(timeout: 1), block)
+    end
 
     def result(registry = nil)
       value(options[:timeout])

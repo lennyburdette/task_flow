@@ -82,12 +82,7 @@ describe TaskFlow do
       end
 
       async :timeout, timeout: 0.1 do
-        sleep(1)
-        :should_not_appear
-      end
-
-      async :timeout_swallowed, timeout: 0.1, on_exception: :swallowed do
-        sleep(1)
+        sleep(3)
         :should_not_appear
       end
 
@@ -95,12 +90,8 @@ describe TaskFlow do
         :should_raise_exception
       end
 
-      sync :from_timeout_handled, :timeout, on_exception: :handled do
-        :should_return_handled
-      end
-
-      sync :from_timeout_swallowed, :timeout_swallowed do |inputs|
-        inputs.timeout_swallowed
+      sync :from_timeout_swallowed, :timeout, on_exception: :swallowed do |inputs|
+        inputs.timeout
       end
 
       async :task_never_ends do
@@ -135,14 +126,9 @@ describe TaskFlow do
       end.to raise_error(Timeout::Error)
     end
 
-    it 'handles a propagated timeout' do
-      expect(ExceptionHandlingCase.new.futures(:from_timeout_handled).from_timeout_handled).to eq :handled
-    end
-
     it 'swallows a timeout at the source' do
       expect(
-        ExceptionHandlingCase.new
-        .futures(:from_timeout_swallowed).from_timeout_swallowed
+        ExceptionHandlingCase.new.futures(:from_timeout_swallowed).from_timeout_swallowed
       ).to eq :swallowed
     end
 
@@ -255,12 +241,10 @@ describe TaskFlow do
       end
 
       async :leaf do
-        sleep(0.1)
         'from leaf'
       end
 
       async :other_leaf do
-        sleep(0.1)
         'no one cares about this but it has to run'
       end
 
@@ -320,12 +304,12 @@ describe TaskFlow do
     end
 
     before do
-      $unused_task_fired = nil
+      $unused_task_fired = false
     end
 
     it 'do not fire' do
       expect(BranchDepsUseCase.new.futures(:f).f).to eq 'f'
-      expect($unused_task_fired).to be_false
+      expect($unused_task_fired).to be false
     end
   end
 
@@ -361,8 +345,8 @@ describe TaskFlow do
 
     it 'reports tasks, exceptions, and result timing' do
       InstrumentedUseCase.new.futures(:result).result
-      expect(events.key?('one.tasks.task_flow')).to be_true
-      expect(events['two.exceptions.task_flow'].last[:swallowed]).to be_true
+      expect(events.key?('one.tasks.task_flow')).to be true
+      expect(events['two.exceptions.task_flow'].last[:swallowed]).to be true
       duration = events['result.results.task_flow'][2] - events['result.results.task_flow'][1]
       expect(duration).to be > 0.2
     end

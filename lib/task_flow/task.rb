@@ -1,7 +1,6 @@
 # encoding: utf-8
 require 'active_support/notifications'
 require 'concurrent'
-require 'timeout'
 require 'task_flow/task_values'
 
 module Concurrent
@@ -18,14 +17,13 @@ module TaskFlow
     delegate :add_observer, to: :task
     delegate :instrument, to: ActiveSupport::Notifications
 
-    cattr_accessor(:default_options) { {} }
     cattr_accessor(:exception_reporter) { ->(*args) {} }
 
     def initialize(name, dependencies, connections, options, block)
       @name         = name
       @dependencies = dependencies
       @connections  = connections
-      @options      = options.reverse_merge(default_options)
+      @options      = options
       @block        = block
       @event        = Concurrent::Event.new
     end
@@ -35,20 +33,10 @@ module TaskFlow
         inputs = registry.slice(*dependencies)
 
         task_class.new do
-          timeout do
-            instrument("#{name}.tasks.task_flow") do
-              block.call(TaskValues.new(inputs), context)
-            end
+          instrument("#{name}.tasks.task_flow") do
+            block.call(TaskValues.new(inputs), context)
           end
         end
-      end
-    end
-
-    def timeout(&block)
-      if options[:timeout]
-        Timeout::timeout(options[:timeout], &block)
-      else
-        yield
       end
     end
 
@@ -67,7 +55,9 @@ module TaskFlow
     end
 
     def dependency_observer
-      @dependency_observer ||= Concurrent::DependencyCounter.new(dependencies.size) { task.execute }
+      @dependency_observer ||= Concurrent::DependencyCounter.new(dependencies.size) do
+        task.execute
+      end
     end
 
     def add_dependency(input)
@@ -79,9 +69,14 @@ module TaskFlow
       task.value(timeout || options[:timeout]) # possibly blocking
 
       case task.state
-      when :fulfilled then task.value
-      when :pending, :unscheduled then (raise Timeout::Error, "#{name} timed out")
-      else (raise task.reason if task.reason)
+        when :fulfilled
+          task.value
+        when :pending
+          raise Timeout::Error, "#{name} timed out"
+        when :unscheduled
+          handle_exception(raise Timeout::Error, "#{name} timed out")
+        else
+          raise task.reason if task.reason
       end
     rescue *TaskFlow::JAVA_EXCEPTIONS => e
       handle_exception(wrap_java_exception(e))
